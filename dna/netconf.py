@@ -42,14 +42,14 @@ def verify_device(row):
             
             # Obtener la configuración actual del dispositivo
             netconf_status = net_connect.send_command("show running-config | include netconf", expect_string=current_prompt, read_timeout=180)
-            print(f'{expected_hostname} netconf_status')
+            pprint(f'{expected_hostname} status: {netconf_status}')
             if netconf_status == "netconf-yang":
                 result = f"{ip_address},{expected_hostname},{current_prompt},netconf-yang configurado"
                 print(result)
             else:
                 net_connect.config_mode()
-                net_connect.send_command("netconf-yang", expect_string=current_prompt, read_timeout=180)
-                net_connect.save_config()
+                net_connect.send_command_timing("netconf-yang", strip_prompt=False, strip_command=False)
+                net_connect.send_command_timing("do wr", strip_prompt=False, strip_command=False)
                 result = f"{ip_address},{expected_hostname},{current_prompt},netconf-yang actualizado" 
                 print(result)
 
