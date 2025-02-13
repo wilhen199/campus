@@ -9,10 +9,10 @@ import re
 
 
 # Leer los datos del archivo xlsx usando pandas
-df = pd.read_excel('./Files/netconf_DNA.xlsx','Hoja1')
+df = pd.read_excel('./Files/TTO.xlsx','Hoja1')
 
 # Guardar el DataFrame en un archivo Excel
-output_file = './Results/netconf_DNA_results.xlsx'
+output_file = './Results/TTO_results.xlsx'
 
 # Datos comunes de conexión para netmiko (ajustar según sea necesario)
 device_params = dev.cisco_ssh
@@ -50,10 +50,10 @@ def verify_device(row):
         "modelo": "N/A",
         "serial": "N/A",
         "software": "N/A",
+        "time": "N/A",
         "users": [],
         "loopback": "N/A",
         "interface_mpls": [],
-        "VLANs": [],
         "int_description": [],
         "tacacs_source": "",
         "snmp_community": "N/A",
@@ -73,8 +73,8 @@ def verify_device(row):
             device_info = net_connect.send_command("show version", expect_string=current_prompt, read_timeout=180)
 
             # Obtener VLANs activas
-            vlan_brief = net_connect.send_command("show vlan brief", expect_string=current_prompt, read_timeout=180)
-            vlans_active = []
+            vlan_brief = net_connect.send_command("show vlan brief | include active", expect_string=current_prompt, read_timeout=180)
+            vlans = []
 
             # Obterner modelo, serial y SO del dispositivo, VLANs
             if "Cisco Nexus" in device_info: # Si el dispositivo es Cisco Nexus, ejecuta este bloque
@@ -87,7 +87,7 @@ def verify_device(row):
                         if len(vlan_data) >= 2:  # Verifica que haya al menos dos elementos (ID y nombre)
                             vlan_id = vlan_data[0]
                             vlan_name = vlan_data[1]
-                            vlans_active.append(f"{vlan_id}   {vlan_name}")
+                            vlans.append([vlan_id, vlan_name])
             else: # Si no es Cisco Nexus, ejecuta este bloque
                 modelo = re.search(r'Model [N-n]umber+(\W)+(.*)', device_info).group(2)
                 serial = re.findall(r'System [S-s]erial [N-n]umber\s+:\s+(\S+)', device_info)
@@ -97,7 +97,8 @@ def verify_device(row):
                         vlan_data = line.split()
                         vlan_id = vlan_data[0]
                         vlan_name = vlan_data[1]
-                        vlans_active.append(f"{vlan_id}   {vlan_name}")
+                        vlans.append([vlan_id, vlan_name])
+            vlans_active = pd.DataFrame(vlans, columns=['ID', 'NAME']).to_string(index=False)
 
             # Obtener usuarios locales creados
             usernames = net_connect.send_command("show running-config | include username", expect_string=current_prompt, read_timeout=180)
@@ -159,6 +160,9 @@ def verify_device(row):
                     ip_address_vlan = int_data[1]
                     ip_int_brief.append(f"{interface}   {ip_address_vlan}")
 
+            # Obtener hora del dispositivo
+            time = net_connect.send_command("show clock", expect_string=current_prompt, read_timeout=180)
+
             # Diccionario con los datos a exportar
             result = {
                 "ip_address": ip_address,
@@ -170,6 +174,7 @@ def verify_device(row):
                 "modelo": modelo,
                 "serial": serial,
                 "software": software,
+                "time": time,
                 "users": existing_users,
                 "loopback": loopback,
                 "interface_mpls": interface_mpls,
@@ -180,7 +185,7 @@ def verify_device(row):
                 "netconf_status": netconf,
                 "license_network": network +" "+ network_status,
                 "license_dna": dna + " " + dna_status,
-                "VLANs": vlan_brief,}    
+                "VLANs": vlans_active,}    
             
     except NetMikoTimeoutException:
         print(f"Timeout al conectar a {ip_address}")
