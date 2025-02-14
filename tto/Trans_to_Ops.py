@@ -37,7 +37,7 @@ def verify_device(row):
     device_params_local['host'] = ip_address
 
     # Guardar logs ssh
-    output_logs = f"./session_logs/session_log_{ip_address}.log"
+    output_logs = f"./session_logs/{ip_address}.log"
     device_params_local['session_log'] = output_logs
 
     # Inicializar result como un diccionario vacío antes de intentar cualquier operación
