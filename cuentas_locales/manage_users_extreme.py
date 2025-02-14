@@ -18,8 +18,8 @@ df = pd.read_excel('./Files/extreme.xlsx','Hoja1')
 output_file = './Results/extreme_results.xlsx'
 
 # Datos comunes de conexión (SSH o Telnet con cuenta NT)
-device_params = dev.extreme_ssh
-#device_params = dev.extreme_telnet
+#device_params = dev.extreme_ssh
+device_params = dev.extreme_telnet
 
 
 # Lista para almacenar los resultados

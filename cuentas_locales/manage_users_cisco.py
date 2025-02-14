@@ -14,11 +14,11 @@ load_dotenv()
 df = pd.read_excel('./Files/cuentas_locales.xlsx','Hoja1')
 
 # Guardar el DataFrame en un archivo Excel
-output_file = './Results/ccuentas_locales_results.xlsx'
+output_file = './Results/cuentas_locales_results.xlsx'
 
 # Datos comunes de conexión para netmiko (ajustar según sea necesario)
-device_params = dev.cisco_ssh
-#device_params = dev.cisco_telnet
+#device_params = dev.cisco_ssh
+device_params = dev.cisco_telnet
 
 # Lista para almacenar los resultados
 results = []
