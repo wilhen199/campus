@@ -1,0 +1,10 @@
+future
+netmiko
+numpy
+openpyxl
+pandas
+paramiko
+pip
+pretty
+rich
+python-dotenv
