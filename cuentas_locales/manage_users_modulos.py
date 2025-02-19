@@ -58,7 +58,9 @@ def manage_cisco(net_connect, ip_address, expected_hostname):
     if delete_commands or new_user_commands:
         net_connect.config_mode()
         for cmd in delete_commands:
-            net_connect.send_command_timing(cmd)
+#            net_connect.send_command_timing(cmd)
+            net_connect.send_command_timing(cmd, strip_prompt=False, strip_command=False)
+            net_connect.send_command_timing('\n', strip_prompt=False, strip_command=False)  # Confirmar eliminación
         net_connect.send_config_set(new_user_commands)
         net_connect.save_config()
 
