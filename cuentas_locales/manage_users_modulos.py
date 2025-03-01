@@ -8,8 +8,12 @@ from netmiko import ConnectHandler, NetMikoTimeoutException, NetMikoAuthenticati
 from paramiko.ssh_exception import SSHException
 import devices as dev
 from rich.pretty import pprint
+import time
 
 load_dotenv()
+
+# Iniciar el tiempo de ejecución
+start_time = time.time()
 
 # Leer los datos del archivo Excel
 df = pd.read_excel('./Files/dispositivos.xlsx', 'Hoja1')
@@ -47,13 +51,17 @@ def handle_exceptions(ip_address, expected_hostname, err):
 # Función para gestionar usuarios en Cisco
 def manage_cisco(net_connect, ip_address, expected_hostname):
     current_prompt = net_connect.find_prompt()
+    device_info = net_connect.send_command("show version", expect_string=current_prompt, read_timeout=180)
     output = net_connect.send_command("show running-config | include username")
     existing_users = [line.split()[1] for line in output.splitlines() if line.startswith('username')]
     allowed_users = {os.getenv('user_campus'), os.getenv('user_ntt')}
 
     delete_commands = [f'no username {user}' for user in existing_users if user not in allowed_users]
     missing_users = allowed_users - set(existing_users)
-    new_user_commands = [f'username {user} privilege 15 secret {os.getenv(f"pass_{user}")}' for user in missing_users]
+    if "Cisco Nexus" in device_info: # Si el dispositivo es Cisco Nexus, ejecuta este bloque
+        new_user_commands = [f'username {user} role network-admin password {os.getenv(f"pass_{user}")}' for user in missing_users]
+    else: # Si no es Cisco Nexus, ejecuta este bloque
+        new_user_commands = [f'username {user} privilege 15 secret {os.getenv(f"pass_{user}")}' for user in missing_users]
 
     if delete_commands or new_user_commands:
         net_connect.config_mode()
@@ -62,7 +70,10 @@ def manage_cisco(net_connect, ip_address, expected_hostname):
             net_connect.send_command_timing(cmd, strip_prompt=False, strip_command=False)
             net_connect.send_command_timing('\n', strip_prompt=False, strip_command=False)  # Confirmar eliminación
         net_connect.send_config_set(new_user_commands)
-        net_connect.save_config()
+        if "Cisco Nexus" in device_info:
+            net_connect.send_command_timing("copy run start", strip_prompt=False, strip_command=False)
+        else:
+            net_connect.send_command_timing("wr", strip_prompt=False, strip_command=False)
 
     return f"{ip_address},{expected_hostname},{current_prompt},Usuarios actualizados"
 
@@ -163,3 +174,8 @@ with cf.ThreadPoolExecutor() as executor:
 # Guardar resultados
 dispositivo_output = './Results/dispositivos_results.xlsx'
 save_results(results, dispositivo_output)
+
+# Calcular y mostrar el tiempo total de ejecución
+end_time = time.time()
+elapsed_time = end_time - start_time
+pprint(f'Tiempo total de ejecución: {elapsed_time:.2f} segundos')
