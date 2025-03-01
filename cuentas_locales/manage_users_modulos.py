@@ -177,5 +177,5 @@ save_results(results, dispositivo_output)
 
 # Calcular y mostrar el tiempo total de ejecución
 end_time = time.time()
-elapsed_time = end_time - start_time
-pprint(f'Tiempo total de ejecución: {elapsed_time:.2f} segundos')
+elapsed_time = (end_time - start_time) / 60
+pprint(f'Tiempo total de ejecución: {elapsed_time:.2f} minutos')
