@@ -20,10 +20,10 @@ df = pd.read_excel('./Files/dispositivos.xlsx', 'Hoja1')
 
 # Guardar resultados
 def save_results(results, output_file):
-    header = ['ip_address', 'expected_hostname', 'prompt', 'result']
+    header = ['ip_address', 'expected_hostname', 'prompt', 'brand', 'result']
     data = []
     for result in results:
-        fields = result.split(',', 3)
+        fields = result.split(',', 4)
         data.append(fields)
     df = pd.DataFrame(data, columns=header)
     #df = pd.DataFrame(results, columns=header)
@@ -38,7 +38,7 @@ def connect_device(device_params, ip_address):
     return ConnectHandler(**device_params_local)
 
 # Función genérica de manejo de errores
-def handle_exceptions(ip_address, expected_hostname, err):
+def handle_exceptions(ip_address, expected_hostname, brand, err):
     error_map = {
         NetMikoTimeoutException: "Error: Timeout",
         NetMikoAuthenticationException: "Error: Authentication failed",
@@ -46,10 +46,10 @@ def handle_exceptions(ip_address, expected_hostname, err):
     }
     error_msg = error_map.get(type(err), f"Error: General {err}")
     pprint(f"{ip_address} - {error_msg}")
-    return f"{ip_address},{expected_hostname},,{error_msg}"
+    return f"{ip_address},{expected_hostname},,{brand},{error_msg}"
 
 # Función para gestionar usuarios en Cisco
-def manage_cisco(net_connect, ip_address, expected_hostname):
+def manage_cisco(net_connect, ip_address, expected_hostname, brand):
     current_prompt = net_connect.find_prompt()
     device_info = net_connect.send_command("show version", expect_string=current_prompt, read_timeout=180)
     output = net_connect.send_command("show running-config | include username")
@@ -75,10 +75,10 @@ def manage_cisco(net_connect, ip_address, expected_hostname):
         else:
             net_connect.send_command_timing("wr", strip_prompt=False, strip_command=False)
 
-    return f"{ip_address},{expected_hostname},{current_prompt},Usuarios actualizados"
+    return f"{ip_address},{expected_hostname},{current_prompt},{brand},Usuarios actualizados"
 
 # Función para gestionar usuarios en Extreme
-def manage_extreme(net_connect, ip_address, expected_hostname):
+def manage_extreme(net_connect, ip_address, expected_hostname, brand):
     current_prompt = net_connect.find_prompt()
     output = net_connect.send_command("show accounts")
     existing_users = re.findall(r'^\s+([a-zA-Z0-9]+)', output, re.MULTILINE)[1:]
@@ -94,10 +94,10 @@ def manage_extreme(net_connect, ip_address, expected_hostname):
         net_connect.send_config_set(new_users)
         net_connect.send_command_timing('save configuration')
 
-    return f"{ip_address},{expected_hostname},{current_prompt},Usuarios actualizados"
+    return f"{ip_address},{expected_hostname},{current_prompt},{brand},Usuarios actualizados"
 
 # Función para gestionar usuarios en Huawei
-def manage_huawei(net_connect, ip_address, expected_hostname):
+def manage_huawei(net_connect, ip_address, expected_hostname, brand):
     current_prompt = net_connect.find_prompt()
     output = net_connect.send_command("display current-configuration | include local-user")
     local_users = set(re.findall(r' local-user (?!policy)(\S+)', output))
@@ -129,12 +129,14 @@ def manage_huawei(net_connect, ip_address, expected_hostname):
             net_connect.send_config_set(new_users)
     net_connect.save_config()
     
-    return f"{ip_address},{expected_hostname},{current_prompt},Usuarios actualizados"
+    return f"{ip_address},{expected_hostname},{current_prompt},{brand},Usuarios actualizados"
 
-# Diccionario de funciones por marca
+# Diccionario de funciones por marca, ajustar si se requiere SSH o Telnet
 BRAND_FUNCTIONS = {
     'Cisco': (dev.cisco_ssh, manage_cisco),
+    #'Cisco': (dev.cisco_telnet, manage_cisco),
     'Extreme': (dev.extreme_ssh, manage_extreme),
+    #'Extreme': (dev.extreme_telnet, manage_extreme),
     'Huawei': (dev.huawei_ssh, manage_huawei)
 }
 
@@ -157,10 +159,10 @@ def verify_device(row):
     
     try:
         with connect_device(device_params, ip_address) as net_connect:
-            result = manage_function(net_connect, ip_address, expected_hostname)
+            result = manage_function(net_connect, ip_address, expected_hostname, brand)
             pprint(result)
     except Exception as err:
-        result = handle_exceptions(ip_address, expected_hostname, err)
+        result = handle_exceptions(ip_address, expected_hostname, brand, err)
     
     with results_lock:
         results.append(result)
