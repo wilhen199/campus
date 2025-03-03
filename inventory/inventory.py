@@ -24,11 +24,11 @@ def clean_text(text):
 
 # Guardar resultados
 def save_results(results, output_file):
-    header = ['ip_address', 'expected_hostname','result_script' ,'prompt', 'brand', 'modelo', 'serial', 'software', 'existing_users', 'snmp', 'tacacs_source']
+    header = ['ip_address', 'expected_hostname','result_script' ,'prompt', 'brand', 'modelo', 'serial', 'software', 'existing_users', 'snmp community']
     
     data = []
     for result in results:
-        fields = result.split(';', 10)
+        fields = result.split(';', 9)
         cleaned_fields = [clean_text(field) for field in fields]  # Aplica la limpieza
         data.append(cleaned_fields)
 
@@ -78,7 +78,11 @@ def manage_cisco(net_connect, ip_address, expected_hostname, brand):
 
     # Obtener SNMP Community
     snmp = net_connect.send_command('show running-config | include community', expect_string=current_prompt, read_timeout=180)
-    
+    snmp_match = re.search(r'ch1kg0', snmp, re.IGNORECASE) 
+    if snmp_match:
+        snmp_match = snmp_match.group(0)
+    else: None
+
     # Obtener ip tacacs source-interface
     tacacs = net_connect.send_command("show running-config | section aaa", expect_string=current_prompt, read_timeout=180)
     tacacs_match = re.search(r'ip tacacs source-interface\s+(.*)', tacacs) if tacacs else None
@@ -86,7 +90,7 @@ def manage_cisco(net_connect, ip_address, expected_hostname, brand):
     result_script= "OK"
 
     #return f"{ip_address},{expected_hostname},{current_prompt},{modelo},{serial},{software},{existing_users},{snmp},{tacacs_source}"
-    return f"{ip_address};{expected_hostname};{result_script};{current_prompt};{brand};{modelo};{serial};{software};{existing_users};{snmp};{tacacs_source}"
+    return f"{ip_address};{expected_hostname};{result_script};{current_prompt};{brand};{modelo};{serial};{software};{existing_users};{snmp_match}"
 
 
 # Función para gestionar equipos Extreme
@@ -99,7 +103,7 @@ def manage_extreme(net_connect, ip_address, expected_hostname, brand):
     device_serial = net_connect.send_command("show version", expect_string=current_prompt, read_timeout=180)
     current_prompt = net_connect.find_prompt()
     modelo = re.search(r'System Type:\s+(.*)', device_info, re.IGNORECASE).group(1)
-    serial = re.search(r'Switch\s+(.:)+\s+(.*)', device_serial, re.IGNORECASE).group(2)
+    serial = re.search(r'(\d{4}[A-Z]-\d{5})', device_serial, re.IGNORECASE).group(1)
     software = re.search(r'Primary ver:\s+(.*)', device_info, re.IGNORECASE).group(1)
 
     # Obtener usuarios locales creados
@@ -108,11 +112,15 @@ def manage_extreme(net_connect, ip_address, expected_hostname, brand):
 
     # Obtener SNMP Community
     snmp = net_connect.send_command('show configuration | include community', expect_string=current_prompt, read_timeout=180)
+    snmp_match = re.search(r'ch1kg0', snmp, re.IGNORECASE) 
+    if snmp_match:
+        snmp_match = snmp_match.group(0)
+    else: None
 
     tacacs_source = "N/A"
     result_script= "OK"
     #return f"{ip_address},{expected_hostname},{current_prompt},{modelo},{serial},{software},{existing_users},{snmp},{tacacs_source}"
-    return f"{ip_address};{expected_hostname};{result_script};{current_prompt};{brand};{modelo};{serial};{software};{existing_users};{snmp};{tacacs_source}"
+    return f"{ip_address};{expected_hostname};{result_script};{current_prompt};{brand};{modelo};{serial};{software};{existing_users};{snmp_match}"
 
 # Función para gestionar equipos Huawei
 def manage_huawei(net_connect, ip_address, expected_hostname, brand):
@@ -133,7 +141,7 @@ def manage_huawei(net_connect, ip_address, expected_hostname, brand):
     tacacs_source = "N/A"
     result_script= "OK"
     #return f"{ip_address},{expected_hostname},{current_prompt},{modelo},{serial},{software},{existing_users},{snmp},{tacacs_source}"
-    return f"{ip_address};{expected_hostname};{result_script};{current_prompt};{brand};{modelo};{serial};{software};{existing_users};{snmp};{tacacs_source}"
+    return f"{ip_address};{expected_hostname};{result_script};{current_prompt};{brand};{modelo};{serial};{software};{existing_users};{snmp}"
 
 
 BRAND_FUNCTIONS = {
@@ -170,8 +178,7 @@ def verify_device(row):
         'serial': '',
         'software': '',
         'existing_users': '',
-        'snmp': '',
-        'tacacs_source': ''}
+        'snmp': '',}
 
     try:
         with connect_device(device_params, ip_address) as net_connect:
