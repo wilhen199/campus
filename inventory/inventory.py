@@ -24,11 +24,11 @@ def clean_text(text):
 
 # Guardar resultados
 def save_results(results, output_file):
-    header = ['ip_address', 'expected_hostname','result_script' ,'prompt', 'modelo', 'serial', 'software', 'existing_users', 'snmp', 'tacacs_source']
+    header = ['ip_address', 'expected_hostname','result_script' ,'prompt', 'brand', 'modelo', 'serial', 'software', 'existing_users', 'snmp', 'tacacs_source']
     
     data = []
     for result in results:
-        fields = result.split(';', 9)
+        fields = result.split(';', 10)
         cleaned_fields = [clean_text(field) for field in fields]  # Aplica la limpieza
         data.append(cleaned_fields)
 
@@ -47,7 +47,7 @@ def connect_device(device_params, ip_address):
     return ConnectHandler(**device_params_local)
 
 # Función genérica de manejo de errores
-def handle_exceptions(ip_address, expected_hostname, err):
+def handle_exceptions(ip_address, expected_hostname, err, brand):
     error_map = {
         NetMikoTimeoutException: "Error: Timeout",
         NetMikoAuthenticationException: "Error: Authentication failed",
@@ -55,10 +55,10 @@ def handle_exceptions(ip_address, expected_hostname, err):
     }
     error_msg = error_map.get(type(err), f"Error: General {err}")
     pprint(f"{ip_address} - {error_msg}")
-    return f"{ip_address};{expected_hostname};{error_msg};"
+    return f"{ip_address};{expected_hostname};{error_msg};{brand};"
 
 # Función para gestionar equipos en Cisco
-def manage_cisco(net_connect, ip_address, expected_hostname):
+def manage_cisco(net_connect, ip_address, expected_hostname, brand):
     current_prompt = net_connect.find_prompt()
     device_info = net_connect.send_command("show version", expect_string=current_prompt, read_timeout=180)
 
@@ -86,11 +86,11 @@ def manage_cisco(net_connect, ip_address, expected_hostname):
     result_script= "OK"
 
     #return f"{ip_address},{expected_hostname},{current_prompt},{modelo},{serial},{software},{existing_users},{snmp},{tacacs_source}"
-    return f"{ip_address};{expected_hostname};{result_script};{current_prompt};{modelo};{serial};{software};{existing_users};{snmp};{tacacs_source}"
+    return f"{ip_address};{expected_hostname};{result_script};{current_prompt};{brand};{modelo};{serial};{software};{existing_users};{snmp};{tacacs_source}"
 
 
 # Función para gestionar equipos Extreme
-def manage_extreme(net_connect, ip_address, expected_hostname):
+def manage_extreme(net_connect, ip_address, expected_hostname, brand):
     current_prompt = net_connect.find_prompt()
 
     # Obtener modelo, serial y SO del dispositivo
@@ -112,10 +112,10 @@ def manage_extreme(net_connect, ip_address, expected_hostname):
     tacacs_source = "N/A"
     result_script= "OK"
     #return f"{ip_address},{expected_hostname},{current_prompt},{modelo},{serial},{software},{existing_users},{snmp},{tacacs_source}"
-    return f"{ip_address};{expected_hostname};{result_script};{current_prompt};{modelo};{serial};{software};{existing_users};{snmp};{tacacs_source}"
+    return f"{ip_address};{expected_hostname};{result_script};{current_prompt};{brand};{modelo};{serial};{software};{existing_users};{snmp};{tacacs_source}"
 
 # Función para gestionar equipos Huawei
-def manage_huawei(net_connect, ip_address, expected_hostname):
+def manage_huawei(net_connect, ip_address, expected_hostname, brand):
     current_prompt = net_connect.find_prompt()
 
     # Obtener modelo, serial y SO del dispositivo
@@ -133,12 +133,14 @@ def manage_huawei(net_connect, ip_address, expected_hostname):
     tacacs_source = "N/A"
     result_script= "OK"
     #return f"{ip_address},{expected_hostname},{current_prompt},{modelo},{serial},{software},{existing_users},{snmp},{tacacs_source}"
-    return f"{ip_address};{expected_hostname};{result_script};{current_prompt};{modelo};{serial};{software};{existing_users};{snmp};{tacacs_source}"
+    return f"{ip_address};{expected_hostname};{result_script};{current_prompt};{brand};{modelo};{serial};{software};{existing_users};{snmp};{tacacs_source}"
 
 
 BRAND_FUNCTIONS = {
     'Cisco': (dev.cisco_ssh, manage_cisco),
+    #'Cisco': (dev.cisco_telnet, manage_cisco),
     'Extreme': (dev.extreme_ssh, manage_extreme),
+    #'Extreme': (dev.extreme_telnet, manage_extreme),
     'Huawei': (dev.huawei_ssh, manage_huawei)
 }
 
@@ -173,10 +175,10 @@ def verify_device(row):
 
     try:
         with connect_device(device_params, ip_address) as net_connect:
-            result = manage_function(net_connect, ip_address, expected_hostname)
+            result = manage_function(net_connect, ip_address, expected_hostname, brand)
             pprint(result)
     except Exception as err:
-        result = handle_exceptions(ip_address, expected_hostname, err)
+        result = handle_exceptions(ip_address, expected_hostname, brand, err)
     
     with results_lock:
         results.append(result)
@@ -188,7 +190,7 @@ with cf.ThreadPoolExecutor() as executor:
         future.result()
 
 # Guardar resultados
-inventory_output = './Results/ex_inventory_results.xlsx'
+inventory_output = './Results/new_inventory_results.xlsx'
 save_results(results, inventory_output)
 
 # Calcular y mostrar el tiempo total de ejecución
