@@ -24,7 +24,7 @@ def clean_text(text):
 
 # Guardar resultados
 def save_results(results, output_file):
-    header = ['ip_address', 'expected_hostname','result_script' ,'prompt', 'brand', 'modelo', 'serial', 'software', 'existing_users', 'snmp community']
+    header = ['ip_address', 'expected_hostname', 'brand', 'result_script' ,'prompt', 'modelo', 'serial', 'software', 'existing_users', 'snmp community']
     
     data = []
     for result in results:
@@ -55,7 +55,7 @@ def handle_exceptions(ip_address, expected_hostname, err, brand):
     }
     error_msg = error_map.get(type(err), f"Error: General {err}")
     pprint(f"{ip_address} - {error_msg}")
-    return f"{ip_address};{expected_hostname};{error_msg};{brand};"
+    return f"{ip_address};{expected_hostname};{brand};{error_msg};"
 
 # Función para gestionar equipos en Cisco
 def manage_cisco(net_connect, ip_address, expected_hostname, brand):
@@ -90,7 +90,7 @@ def manage_cisco(net_connect, ip_address, expected_hostname, brand):
     result_script= "OK"
 
     #return f"{ip_address},{expected_hostname},{current_prompt},{modelo},{serial},{software},{existing_users},{snmp},{tacacs_source}"
-    return f"{ip_address};{expected_hostname};{result_script};{current_prompt};{brand};{modelo};{serial};{software};{existing_users};{snmp_match}"
+    return f"{ip_address};{expected_hostname};{brand};{result_script};{current_prompt};{modelo};{serial};{software};{existing_users};{snmp_match}"
 
 
 # Función para gestionar equipos Extreme
@@ -120,7 +120,7 @@ def manage_extreme(net_connect, ip_address, expected_hostname, brand):
     tacacs_source = "N/A"
     result_script= "OK"
     #return f"{ip_address},{expected_hostname},{current_prompt},{modelo},{serial},{software},{existing_users},{snmp},{tacacs_source}"
-    return f"{ip_address};{expected_hostname};{result_script};{current_prompt};{brand};{modelo};{serial};{software};{existing_users};{snmp_match}"
+    return f"{ip_address};{expected_hostname};{brand};{result_script};{current_prompt};{modelo};{serial};{software};{existing_users};{snmp_match}"
 
 # Función para gestionar equipos Huawei
 def manage_huawei(net_connect, ip_address, expected_hostname, brand):
@@ -141,7 +141,7 @@ def manage_huawei(net_connect, ip_address, expected_hostname, brand):
     tacacs_source = "N/A"
     result_script= "OK"
     #return f"{ip_address},{expected_hostname},{current_prompt},{modelo},{serial},{software},{existing_users},{snmp},{tacacs_source}"
-    return f"{ip_address};{expected_hostname};{result_script};{current_prompt};{brand};{modelo};{serial};{software};{existing_users};{snmp}"
+    return f"{ip_address};{expected_hostname};{brand};{result_script};{current_prompt};{modelo};{serial};{software};{existing_users};{snmp}"
 
 
 BRAND_FUNCTIONS = {
@@ -197,7 +197,7 @@ with cf.ThreadPoolExecutor() as executor:
         future.result()
 
 # Guardar resultados
-inventory_output = './Results/new_inventory_results.xlsx'
+inventory_output = './Results/inventory_results.xlsx'
 save_results(results, inventory_output)
 
 # Calcular y mostrar el tiempo total de ejecución
