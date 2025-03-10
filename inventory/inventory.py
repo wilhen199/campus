@@ -47,7 +47,7 @@ def connect_device(device_params, ip_address):
     return ConnectHandler(**device_params_local)
 
 # Función genérica de manejo de errores
-def handle_exceptions(ip_address, expected_hostname, err, brand):
+def handle_exceptions(ip_address, expected_hostname, brand, err):
     error_map = {
         NetMikoTimeoutException: "Error: Timeout",
         NetMikoAuthenticationException: "Error: Authentication failed",
@@ -55,7 +55,7 @@ def handle_exceptions(ip_address, expected_hostname, err, brand):
     }
     error_msg = error_map.get(type(err), f"Error: General {err}")
     pprint(f"{ip_address} - {error_msg}")
-    return f"{ip_address};{expected_hostname};{brand};{error_msg};"
+    return f"{ip_address};{expected_hostname};{brand};{error_msg};;;;;;"
 
 # Función para gestionar equipos en Cisco
 def manage_cisco(net_connect, ip_address, expected_hostname, brand):
