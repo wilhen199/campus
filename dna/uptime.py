@@ -24,7 +24,7 @@ results_lock = threading.Lock()
 def verify_device(row):
     ip_address = row['ip_address']
     expected_hostname = row.get('expected_hostname')  # Obtener el nombre del host esperado si está disponible
-    result = f"{ip_address},{expected_hostname},,Error: Salida inesperada en el comando 'show license usage'"  # Inicializar result
+    result = f"{ip_address},{expected_hostname},,Error: Salida inesperada"  # Inicializar result
 
 
     # Actualizar los parámetros del dispositivo con la IP actual
