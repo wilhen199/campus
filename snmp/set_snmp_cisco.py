@@ -8,10 +8,10 @@ from rich.pretty import pprint
 
 
 # Leer los datos del archivo xlsx usando pandas
-df = pd.read_excel('./Files/snmp_cisco_1_telnet_man_send.xlsx','Hoja1')
+df = pd.read_excel('./Files/snmp_cisco.xlsx','Hoja1')
 
 # Guardar el DataFrame en un archivo Excel
-output_file = 'snmp_cisco_1_telnet_man_send_results.xlsx'
+output_file = './Results/snmp_cisco_send_results.xlsx'
 
 # # Datos comunes de conexión (SSH o Telnet con cuenta NT, mantenimiento, fala04, faladmin)
 device_params = dev.cisco_ssh
@@ -34,6 +34,10 @@ def verify_device(row):
     # Actualizar los parámetros del dispositivo con la IP actual
     device_params_local = device_params.copy()
     device_params_local['host'] = ip_address
+
+    # Guardar logs ssh
+    output_logs = f"./session_logs/session_log_{ip_address}.log"
+    device_params_local['session_log'] = output_logs
 
     pprint(f"Conectando a {ip_address}...")
     try:

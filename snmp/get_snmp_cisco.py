@@ -11,7 +11,7 @@ from rich.pretty import pprint
 df = pd.read_excel('./Files/snmp_extreme_4.xlsx')
 
 # Guardar el DataFrame en un archivo Excel
-output_file = 'snmp_extreme_4_results.xlsx'
+output_file = './Results/snmp_extreme_4_results.xlsx'
 
 
 # Datos comunes de conexión (SSH o Telnet con cuenta NT, mantenimiento, fala04, faladmin)
@@ -36,6 +36,10 @@ def verify_device(row):
     # Actualizar los parámetros del dispositivo con la IP actual
     device_params_local = device_params.copy()
     device_params_local['host'] = ip_address
+    
+    # Guardar logs ssh
+    output_logs = f"./session_logs/session_log_{ip_address}.log"
+    device_params_local['session_log'] = output_logs
     
     pprint(f"Conectando a {ip_address}...")
     try:
