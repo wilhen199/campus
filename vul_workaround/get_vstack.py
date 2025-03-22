@@ -11,7 +11,7 @@ import re
 df = pd.read_excel('./Files/vstack.xlsx','Hoja1')
 
 # Guardar el DataFrame en un archivo Excel
-output_file = './Results/telnet_vstack_results.xlsx'
+output_file = './Results/set_no_vstack_results.xlsx'
 
 # Datos comunes de conexión para netmiko (ajustar según sea necesario)
 device_params = dev.cisco_ssh
