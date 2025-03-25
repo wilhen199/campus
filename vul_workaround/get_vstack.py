@@ -73,7 +73,7 @@ with cf.ThreadPoolExecutor() as executor:
         future.result()
 
 # Encabezados para guardar resultados en un archivo xlsx:
-header = ['ip_address', 'expected_hostname', 'prompt', 'uptime']  # Definir el encabezado del archivo
+header = ['ip_address', 'expected_hostname', 'prompt', 'result']  # Definir el encabezado del archivo
 
 data = []
 for result in results:
