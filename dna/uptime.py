@@ -41,27 +41,29 @@ def verify_device(row):
             # Entrar al modo enable
             net_connect.enable()
             current_prompt = net_connect.find_prompt()
-            
-            # Obtener la configuración actual del dispositivo
-            output = (net_connect.send_command("show version", expect_string=current_prompt, read_timeout=180))
-            uptime = re.search(r'uptime+(.*)', output).group()
-            print(uptime)
 
-            result = f"{ip_address},{expected_hostname},{current_prompt},{uptime}"
-            print(result)
-    
+            result_script = 'OK'
+            # Obtener la configuración actual del dispositivo
+            device_info = (net_connect.send_command("show version", expect_string=current_prompt, read_timeout=180))
+            modelo = re.search(r'Model [N-n]umber+(\W)+(.*)', device_info).group(2)
+            serial = re.findall(r'System [S-s]erial [N-n]umber\s+:\s+(\S+)', device_info)
+            software = re.search(r'(Version)+(.*)', device_info).group()
+            uptime = re.search(r'uptime+(.*)', device_info).group()
+
+            #result = f"{ip_address},{expected_hostname},{result_script},{current_prompt},{uptime},{modelo},{serial},{software}"
+            result = f"{ip_address};{expected_hostname};{result_script};{current_prompt};{uptime};{modelo};{serial};{software}"
     except NetMikoTimeoutException:
         print(f"Timeout al conectar a {ip_address}")
-        result = f"{ip_address},{expected_hostname},,Error: Timeout"
+        result = f"{ip_address};{expected_hostname};Error: Timeout;;;;;"
     except NetMikoAuthenticationException:
         print(f"Autenticación fallida al conectar a {ip_address}")
-        result = f"{ip_address},{expected_hostname},,Error: Authentication failed"
+        result = f"{ip_address};{expected_hostname};Error: Authentication failed;;;;;"
     except (SSHException):
         print (f'SSH might not be enabled: {ip_address}')
-        result = f"{ip_address},{expected_hostname},,Error: SSH connection failed"
+        result = f"{ip_address};{expected_hostname};Error: SSH connection failed;;;;;"
     except Exception as err:
         print(f"Error al conectar a {ip_address}: {err}")
-        result = f"{ip_address},{expected_hostname},,Error: General {err}"
+        result = f"{ip_address};{expected_hostname};Error: General {err};;;;;"
     with results_lock:
         results.append(result)
 
@@ -74,11 +76,11 @@ with cf.ThreadPoolExecutor() as executor:
         future.result()
 
 # Encabezados para guardar resultados en un archivo xlsx:
-header = ['ip_address', 'expected_hostname', 'prompt', 'uptime']  # Definir el encabezado del archivo
+header = ['ip_address', 'expected_hostname', 'result_script', 'prompt', 'uptime', 'modelo', 'serial', 'software']  # Definir el encabezado del archivo
 
 data = []
 for result in results:
-    fields = result.split(',', 3)
+    fields = result.split(';', 7)
     data.append(fields)
 
 # Crear un DataFrame con los resultados
