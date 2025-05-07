@@ -6,7 +6,10 @@ from paramiko.ssh_exception import SSHException
 import devices as dev
 from rich.pretty import pprint
 import re
+import time
 
+# Iniciar el tiempo de ejecución
+start_time = time.time()
 
 # Leer los datos del archivo xlsx usando pandas
 df = pd.read_excel('./Files/TTO.xlsx','Hoja1')
@@ -216,3 +219,8 @@ df = pd.DataFrame(results)
 # Guardar el DataFrame en un archivo Excel
 df.to_excel(output_file, index=False)
 pprint(f'Resultados guardados en {output_file}')
+
+# Calcular y mostrar el tiempo total de ejecución
+end_time = time.time()
+elapsed_time = (end_time - start_time) / 60
+pprint(f'Tiempo total de ejecución: {elapsed_time:.2f} minutos')
