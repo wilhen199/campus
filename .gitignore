@@ -22,3 +22,4 @@
 /snmp2_old
 .env
 */credentials.py
+/netbox
