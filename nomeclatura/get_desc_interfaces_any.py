@@ -95,19 +95,18 @@ def extract_cisco_interfaces(net_connect, ip_address, expected_hostname, results
         read_timeout=180
     )
     
-    pattern = re.compile(
-        r"^(?P<Interface>\S+)\s+(?P<Status>admin down|up|down)\s+(?P<Protocol>up|down)\s*(?P<Description>.*)$",
-        re.MULTILINE
-    )
-    
+    lines = output_interfaces.splitlines()
     found_interfaces_for_device = []
-    matches = pattern.finditer(output_interfaces)
-    for match in matches:
-        interface = match.group("Interface").strip()
-        status = match.group("Status").strip()
-        description = match.group("Description").strip()
-        #print(f"Interface: {interface}, Status: {status}, Description: {description}")
-        
+    for line in lines:
+        if not line.strip() or line.lower().startswith('interface'):
+            continue
+        parts = re.split(r'\s{3,}', line.strip(), maxsplit=3)
+        if len(parts) < 3:
+            continue  
+        interface = parts[0].strip()
+        status = parts[1].strip()
+        description = parts[3].strip() if len(parts) > 3 else ''
+        print(f"Interface: {interface}, Status: {status}, Description: {description}")
         found_interfaces_for_device.append({
             'ip_address': ip_address,
             'expected_hostname': expected_hostname,
@@ -117,7 +116,7 @@ def extract_cisco_interfaces(net_connect, ip_address, expected_hostname, results
             'description': description,
             'result': 'Success'
         })
-    
+
     if not found_interfaces_for_device:
         found_interfaces_for_device.append({
             'ip_address': ip_address,
@@ -150,7 +149,6 @@ def extract_cisco_nexus_interfaces(net_connect, ip_address, expected_hostname, r
     output_interfaces_filtered = "\n".join(relevant_lines)
 
     # Adjusted Regular Expression for Cisco Nexus output format
-    # Example format: "Eth1/21        eth    40G     CO-TUB-FAL-CLR-MPLS-FEB0033-15M-PPAL"
     pattern = re.compile(
         r"^(?P<interface>\S+)\s+\S+\s+\S+\s+(?P<description>.*(?:MPLS|INT).*)$",
         re.MULTILINE

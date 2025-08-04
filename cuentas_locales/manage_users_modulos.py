@@ -59,7 +59,7 @@ def manage_cisco(net_connect, ip_address, expected_hostname, brand):
     delete_commands = [f'no username {user}' for user in existing_users if user not in allowed_users]
     missing_users = allowed_users - set(existing_users)
     if "Cisco Nexus" in device_info: # Si el dispositivo es Cisco Nexus, ejecuta este bloque
-        new_user_commands = [f'username {user} role network-admin password {os.getenv(f"pass_{user}")}' for user in missing_users]
+        new_user_commands = [f'username {user} role priv-15 password {os.getenv(f"pass_{user}")}' for user in missing_users]
     else: # Si no es Cisco Nexus, ejecuta este bloque
         new_user_commands = [f'username {user} privilege 15 secret {os.getenv(f"pass_{user}")}' for user in missing_users]
 
