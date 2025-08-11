@@ -56,7 +56,6 @@ def verify_device(row):
             
             # Configuración de la interfaz
             output = net_connect.send_command(f"show interface description | include {interface_device} ", expect_string=current_prompt, read_timeout=180)
-            
 			# Entrar al modo de configuración global
             net_connect.config_mode()
             
@@ -68,6 +67,7 @@ def verify_device(row):
             pprint(f"Descripción actualizada: {ip_address} {expected_hostname} {interface_device} {new_description}")
             result = f"{ip_address},{expected_hostname},{current_prompt},{interface_device},{new_description}"
             net_connect.save_config()
+            net_connect.send_command_timing(f"copy running-config startup-config", strip_prompt=False, read_timeout=180)
     except NetMikoTimeoutException:
         print(f"Timeout al conectar a {ip_address}")
         result = f"{ip_address},{expected_hostname},,,,Error: Timeout"
