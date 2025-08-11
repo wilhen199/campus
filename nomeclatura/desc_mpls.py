@@ -67,7 +67,7 @@ def verify_device(row):
             new_description = re.search(r'description (.+)', config).group(1)
             pprint(f"Descripción actualizada: {ip_address} {expected_hostname} {interface_device} {new_description}")
             result = f"{ip_address},{expected_hostname},{current_prompt},{interface_device},{new_description}"
-            
+            net_connect.save_config()
     except NetMikoTimeoutException:
         print(f"Timeout al conectar a {ip_address}")
         result = f"{ip_address},{expected_hostname},,,,Error: Timeout"
