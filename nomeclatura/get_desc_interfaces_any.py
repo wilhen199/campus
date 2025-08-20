@@ -14,36 +14,36 @@ load_dotenv()
 
 start_time = time.time()
 
-# Lista para almacenar los resultados y su Lock para concurrencia
+# List to store results and its Lock for concurrency
 results = []
 results_lock = threading.Lock()
 
-# Leer los datos del archivo Excel
+# Read data from the Excel file
 try:
     df = pd.read_excel('./Files/desc_interfaces.xlsx', 'Hoja1')
     if 'vendor' not in df.columns:
-        raise ValueError("La columna 'vendor' no se encontró en el archivo Excel.")
+        raise ValueError("The column 'vendor' was not found in the Excel file.")
 except FileNotFoundError:
-    pprint("Advertencia: El archivo 'desc_interfaces.xlsx' no se encontró. Asegúrate de que existe en la carpeta 'Files/'.")
+    pprint("Warning: The file 'desc_interfaces.xlsx' was not found. Make sure it exists in the 'Files/' folder.")
 except ValueError as e:
-    pprint(f"Error en el archivo Excel: {e}")
+    pprint(f"Excel file error: {e}")
     exit()
 
-# Guardar resultados
+# Save results
 def save_results(results_list, output_file):
     header = ['ip_address', 'expected_hostname', 'brand', 'interface', 'status', 'description', 'result']
     df_results = pd.DataFrame(results_list, columns=header)
     df_results.to_excel(output_file, index=False)
     pprint(f'Resultados guardados en {output_file}')
 
-# Función para conectarse a un dispositivo
+# Function to connect to a device
 def connect_device(device_params, ip_address):
     device_params_local = device_params.copy()
     device_params_local['host'] = ip_address
     device_params_local['session_log'] = f"./session_logs/{ip_address}.log"
     return ConnectHandler(**device_params_local)
 
-# Función genérica de manejo de errores
+# Generic error handling function
 def handle_exceptions(ip_address, expected_hostname, vendor, err, results, results_lock):
     error_map = {
         NetMikoTimeoutException: "Error: Timeout",
@@ -65,17 +65,17 @@ def handle_exceptions(ip_address, expected_hostname, vendor, err, results, resul
     with results_lock:
         results.append(error_data)
 
-# Función para extraer interfaces con MPLS/INT de dispositivos Cisco (IOS/IOS-XE)
+# Function to extract interfaces with MPLS/INT from Cisco devices (IOS/IOS-XE)
 def extract_cisco_interfaces(net_connect, ip_address, expected_hostname, results, results_lock):
     """
-    Extrae interfaces con MPLS/INT de dispositivos Cisco (IOS/IOS-XE)
-    o delega a la función Nexus si se detecta un Nexus.
+    Extracts interfaces with MPLS/INT from Cisco devices (IOS/IOS-XE)
+    or delegates to the Nexus function if a Nexus is detected.
     """
     current_prompt = net_connect.find_prompt()
     
     is_nexus = False
     try:
-        # Send a basic command to get version information
+    # Send a basic command to get version information
         version_output = net_connect.send_command("show version | include Cisco", use_textfsm=False, read_timeout=10)
         if "Cisco Nexus" in version_output or "NX-OS" in version_output:
             is_nexus = True
@@ -84,7 +84,7 @@ def extract_cisco_interfaces(net_connect, ip_address, expected_hostname, results
             pprint(f"Detected Cisco IOS/IOS-XE device: {ip_address}")
     except Exception as e:
         pprint(f"Could not determine Cisco device type for {ip_address}: {e}. Assuming IOS/IOS-XE.")
-        # If version command fails, proceed as IOS and let it fail if it's Nexus and commands don't match.
+    # If version command fails, proceed as IOS and let it fail if it's Nexus and commands don't match.
 
     if is_nexus:
         return extract_cisco_nexus_interfaces(net_connect, ip_address, expected_hostname, results, results_lock)
@@ -131,43 +131,34 @@ def extract_cisco_interfaces(net_connect, ip_address, expected_hostname, results
     with results_lock:
         results.extend(found_interfaces_for_device)
 
-# Función para extraer interfaces con MPLS/INT de dispositivos Cisco Nexus
+# Function to extract interfaces with MPLS/INT from Cisco Nexus devices
 def extract_cisco_nexus_interfaces(net_connect, ip_address, expected_hostname, results, results_lock):
     current_prompt = net_connect.find_prompt()
     
     output_interfaces_raw = net_connect.send_command(
-        f"show interface description | include MPLS|INT",
+        f"show interface description",
         expect_string=current_prompt,
         read_timeout=180
     )
 
-    # Filter lines containing "MPLS" or "INT" in Python, similar to '| include'
-    relevant_lines = [
-        line for line in output_interfaces_raw.splitlines() 
-        if "MPLS" in line or "INT" in line
-    ]
-    output_interfaces_filtered = "\n".join(relevant_lines)
-
-    # Adjusted Regular Expression for Cisco Nexus output format
-    pattern = re.compile(
-        r"^(?P<interface>\S+)\s+\S+\s+\S+\s+(?P<description>.*(?:MPLS|INT).*)$",
-        re.MULTILINE
-    )
-    
+    lines = output_interfaces_raw.splitlines()
     found_interfaces_for_device = []
-    matches = pattern.finditer(output_interfaces_filtered) # Apply regex to the filtered lines
-    for match in matches:
-        interface = match.group("interface").strip()
-        description = match.group("description").strip()
-        
-        status = "N/A (from description)" # Status is not directly available from this command on Nexus
-        
+    for line in lines:
+        if not line.strip() or line.lower().startswith('Eth'):
+            continue
+        parts = re.split(r'\s{3,}', line.strip(), maxsplit=3)
+        if len(parts) < 3:
+            continue  
+        interface = parts[0].strip()
+        speed = parts[2].strip()
+        description = parts[3].strip() if len(parts) > 3 else ''
+        print(f"Interface: {interface}, Status: {speed}, Description: {description}")
         found_interfaces_for_device.append({
             'ip_address': ip_address,
             'expected_hostname': expected_hostname,
             'brand': 'cisco',
             'interface': interface,
-            'status': status,
+            'status': speed,
             'description': description,
             'result': 'Success'
         })
@@ -186,9 +177,9 @@ def extract_cisco_nexus_interfaces(net_connect, ip_address, expected_hostname, r
     with results_lock:
         results.extend(found_interfaces_for_device)
 
-# Función para extraer interfaces con MPLS/INT de dispositivos Extreme
+# Function to extract interfaces with MPLS/INT from Extreme devices
 def extract_extreme_interfaces(net_connect, ip_address, expected_hostname, results, results_lock):
-    """Extrae interfaces con MPLS/INT de dispositivos Extreme."""
+    """Extracts interfaces with MPLS/INT from Extreme devices."""
     current_prompt = net_connect.find_prompt()
     output_interfaces = net_connect.send_command(
         f"show port description | include MPLS|MOV|IFX|CLR",
@@ -231,7 +222,7 @@ def extract_extreme_interfaces(net_connect, ip_address, expected_hostname, resul
     with results_lock:
         results.extend(found_interfaces_for_device)
 
-# Función para extraer interfaces con MPLS/INT de dispositivos Huawei
+# Function to extract interfaces with MPLS/INT from Huawei devices
 def extract_huawei_interfaces(net_connect, ip_address, expected_hostname, results, results_lock):
     current_prompt = net_connect.find_prompt()
     output_interfaces = net_connect.send_command(
@@ -275,7 +266,7 @@ def extract_huawei_interfaces(net_connect, ip_address, expected_hostname, result
     with results_lock:
         results.extend(found_interfaces_for_device)
 
-# Diccionario de funciones por marca, ajustar si se requiere SSH o Telnet
+# Dictionary of functions by brand, adjust if SSH or Telnet is required
 BRAND_HANDLERS = {
     'cisco': {'params': dev.cisco_ssh, 'extract_func': extract_cisco_interfaces},
     'cisco_nexus': {'params': dev.cisco_ssh, 'extract_func': extract_cisco_nexus_interfaces}, 
@@ -290,7 +281,7 @@ def verify_device(row):
 
     handler = BRAND_HANDLERS.get(vendor)
     if not handler:
-        handle_exceptions(ip_address, expected_hostname, vendor, f"Vendor '{vendor}' no soportado", results, results_lock)
+        handle_exceptions(ip_address, expected_hostname, vendor, f"Vendor '{vendor}' not supported", results, results_lock)
         return
 
     device_params = handler['params']
@@ -306,17 +297,17 @@ def verify_device(row):
     except Exception as err:
         handle_exceptions(ip_address, expected_hostname, vendor, err, results, results_lock)
 
-# Ejecutar en múltiples hilos
+# Run in multiple threads
 with cf.ThreadPoolExecutor() as executor:
     futures = [executor.submit(verify_device, row) for _, row in df.iterrows()]
     for future in cf.as_completed(futures):
         future.result()
 
-# Guardar resultados
+# Save results
 output_excel_file = './Results/filtered_interfaces_summary.xlsx'
 save_results(results, output_excel_file)
 
-# Calcular y mostrar el tiempo total de ejecución
+# Calculate and display the total execution time
 end_time = time.time()
 elapsed_time = (end_time - start_time) / 60
-pprint(f'Tiempo total de ejecución: {elapsed_time:.2f} minutos')
+pprint(f'Total execution time: {elapsed_time:.2f} minutos')
