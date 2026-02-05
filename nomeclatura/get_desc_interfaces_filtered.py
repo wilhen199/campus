@@ -21,7 +21,7 @@ results_lock = threading.Lock()
 try:
     df = pd.read_excel('./Files/desc_interfaces.xlsx', 'Hoja1')
     if 'vendor' not in df.columns:
-        raise ValueError("The column 'vendor' was not found in the Excel file.")
+        raise ValueError("La columna 'vendor' no se encontró en el archivo Excel.")
 except FileNotFoundError:
     pprint("Warning: The file 'desc_interfaces.xlsx' was not found. Make sure it exists in the 'Files/' folder.")
 except ValueError as e:
@@ -34,7 +34,6 @@ def save_results(results_list, output_file):
     df_results = pd.DataFrame(results_list, columns=header)
     df_results.to_excel(output_file, index=False)
     pprint(f'Resultados guardados en {output_file}')
-    pprint(df_results)
 
 # Function to connect to a device
 def connect_device(device_params, ip_address):
@@ -56,7 +55,7 @@ def handle_exceptions(ip_address, expected_hostname, vendor, err, results, resul
     error_data = {
         'ip_address': ip_address,
         'expected_hostname': expected_hostname,
-        'brand': vendor,
+        'vendor': vendor,
         'interface': 'N/A',
         'status': 'N/A',
         'description': error_msg,
@@ -65,7 +64,7 @@ def handle_exceptions(ip_address, expected_hostname, vendor, err, results, resul
     with results_lock:
         results.append(error_data)
 
-# Function to extract interfaces from Cisco devices (IOS/IOS-XE)
+# Function to extract interfaces with MPLS/INET/P2P from Cisco devices (IOS/IOS-XE)
 def extract_cisco_interfaces(net_connect, ip_address, expected_hostname, results, results_lock):
     """
     Extracts interfaces from Cisco devices (IOS/IOS-XE)
@@ -83,79 +82,88 @@ def extract_cisco_interfaces(net_connect, ip_address, expected_hostname, results
             pprint(f"Detected Cisco IOS/IOS-XE device: {ip_address}")
     except Exception as e:
         pprint(f"Could not determine Cisco device type for {ip_address}: {e}. Assuming IOS/IOS-XE.")
-    # If version command fails, proceed as IOS and let it fail if it's Nexus and commands don't match.
+        # If version command fails, proceed as IOS and let it fail if it's Nexus and commands don't match.
 
     if is_nexus:
         return extract_cisco_nexus_interfaces(net_connect, ip_address, expected_hostname, results, results_lock)
     
     output_interfaces = net_connect.send_command(
-        f"show interface description",
+        f"show interface description | include MPLS|INET|P2P",
         expect_string=current_prompt,
         read_timeout=180
     )
     
-    lines = output_interfaces.splitlines()
+    pattern = re.compile(
+        r"^(?P<interface>\S+)\s+(?P<status>admin down|down|up)\s+(?:\S+)\s+(?P<description>.*(?:MPLS|INET).*)$",
+        re.MULTILINE
+    )
+    
     found_interfaces_for_device = []
-    for line in lines:
-        if not line.strip() or line.lower().startswith('interface'):
-            continue
-        parts = re.split(r'\s{3,}', line.strip(), maxsplit=3)
-        if len(parts) < 3:
-            continue  
-        interface = parts[0].strip()
-        status = parts[1].strip()
-        description = parts[3].strip() if len(parts) > 3 else ''
+    matches = pattern.finditer(output_interfaces)
+    for match in matches:
+        interface = match.group("interface").strip()
+        status = match.group("status").strip()
+        description = match.group("description").strip()
+        
         found_interfaces_for_device.append({
             'ip_address': ip_address,
             'expected_hostname': expected_hostname,
-            'brand': 'cisco',
+            'vendor': 'cisco',
             'interface': interface,
             'status': status,
             'description': description,
             'result': 'Success'
         })
-
+    
     if not found_interfaces_for_device:
         found_interfaces_for_device.append({
             'ip_address': ip_address,
             'expected_hostname': expected_hostname,
-            'brand': 'cisco',
+            'vendor': 'cisco',
             'interface': 'N/A',
             'status': 'N/A',
-            'description': 'No interfaces with MPLS or INT found',
+            'description': 'No interfaces with MPLS | INT | P2P found',
             'result': 'No relevant interfaces'
         })
     
     with results_lock:
         results.extend(found_interfaces_for_device)
 
-# Function to extract interfaces from Cisco Nexus devices
+# Function to extract interfaces with MPLS/INT/P2P from Cisco Nexus devices
 def extract_cisco_nexus_interfaces(net_connect, ip_address, expected_hostname, results, results_lock):
     current_prompt = net_connect.find_prompt()
     
     output_interfaces_raw = net_connect.send_command(
-        f"show interface description",
+        f"show interface description | include MPLS|INET|P2P",
         expect_string=current_prompt,
         read_timeout=180
     )
 
-    lines = output_interfaces_raw.splitlines()
+    relevant_lines = [
+        line for line in output_interfaces_raw.splitlines() 
+        if "MPLS" in line or "INET" in line or "P2P" in line
+    ]
+    output_interfaces_filtered = "\n".join(relevant_lines)
+
+    pattern = re.compile(
+        r"^(?P<interface>\S+)\s+\S+\s+\S+\s+(?P<description>.*(?:MPLS|INET|P2P).*)$",
+        re.MULTILINE
+    )
+    
     found_interfaces_for_device = []
-    for line in lines:
-        if not line.strip() or line.lower().startswith('Eth'):
-            continue
-        parts = re.split(r'\s{3,}', line.strip(), maxsplit=3)
-        if len(parts) < 3:
-            continue  
-        interface = parts[0].strip()
-        speed = parts[2].strip()
-        description = parts[3].strip() if len(parts) > 3 else ''
+    matches = pattern.finditer(output_interfaces_filtered)
+    for match in matches:
+        interface = match.group("interface").strip()
+        description = match.group("description").strip()
+        
+        status = "N/A (from description)" # Status is not directly available from this command on Nexus
+        
         found_interfaces_for_device.append({
             'ip_address': ip_address,
             'expected_hostname': expected_hostname,
-            'brand': 'cisco',
+            'vendor': 'cisco',
             'interface': interface,
-            'status': speed,
+            'status': status,
             'description': description,
             'result': 'Success'
         })
@@ -164,22 +172,22 @@ def extract_cisco_nexus_interfaces(net_connect, ip_address, expected_hostname, r
         found_interfaces_for_device.append({
             'ip_address': ip_address,
             'expected_hostname': expected_hostname,
-            'brand': 'cisco',
+            'vendor': 'cisco',
             'interface': 'N/A',
             'status': 'N/A',
-            'description': 'No interfaces with MPLS or INT found (Cisco Nexus)',
+            'description': 'No interfaces with MPLS | INT | P2P found (Cisco Nexus)',
             'result': 'No relevant interfaces'
         })
     
     with results_lock:
         results.extend(found_interfaces_for_device)
 
-# Function to extract interfaces from Extreme devices
+# Function to extract interfaces with MPLS/INET/P2P from Extreme devices
 def extract_extreme_interfaces(net_connect, ip_address, expected_hostname, results, results_lock):
-    """Extracts interfaces from Extreme devices."""
+    """Extract interfaces with MPLS/INET/P2P from Extreme devices."""
     current_prompt = net_connect.find_prompt()
     output_interfaces = net_connect.send_command(
-        f"show port description ",
+        f"show port description | include MPLS|INET|P2P|MOV|MVS|CLR|ENT|CIR|IFX|GTD",
         expect_string=current_prompt,
         read_timeout=180
     )
@@ -192,7 +200,7 @@ def extract_extreme_interfaces(net_connect, ip_address, expected_hostname, resul
             header_idx = i
             header_line = ln
             break
-
+    
     found_interfaces_for_device = []
 
     if header_line:
@@ -217,7 +225,7 @@ def extract_extreme_interfaces(net_connect, ip_address, expected_hostname, resul
             found_interfaces_for_device.append({
                 'ip_address': ip_address,
                 'expected_hostname': expected_hostname,
-                'brand': 'extreme',
+                'vendor': 'extreme',
                 'interface': interface,
                 'status': 'N/A',
                 'description': display,
@@ -235,7 +243,7 @@ def extract_extreme_interfaces(net_connect, ip_address, expected_hostname, resul
             found_interfaces_for_device.append({
                 'ip_address': ip_address,
                 'expected_hostname': expected_hostname,
-                'brand': 'extreme',
+                'vendor': 'extreme',
                 'interface': interface,
                 'status': 'N/A',
                 'description': description,
@@ -246,21 +254,22 @@ def extract_extreme_interfaces(net_connect, ip_address, expected_hostname, resul
         found_interfaces_for_device.append({
             'ip_address': ip_address,
             'expected_hostname': expected_hostname,
-            'brand': 'extreme',
+            'vendor': 'extreme',
             'interface': 'N/A',
             'status': 'N/A',
-            'description': 'No interfaces description found',
+            'description': 'No interfaces description found with MPLS | INET | P2P',
             'result': 'No relevant interfaces'
         })
     
     with results_lock:
         results.extend(found_interfaces_for_device)
 
+
 # Function to extract interfaces with MPLS/INT from Huawei devices
 def extract_huawei_interfaces(net_connect, ip_address, expected_hostname, results, results_lock):
     current_prompt = net_connect.find_prompt()
     output_interfaces = net_connect.send_command(
-        f"display interface description",
+        f"display interface description | include MPLS|INET|P2P",
         expect_string=current_prompt,
         read_timeout=180
     )
@@ -272,7 +281,10 @@ def extract_huawei_interfaces(net_connect, ip_address, expected_hostname, result
             header_idx = i
             break
 
-    pattern = re.compile(r"^(?P<interface>\S+)\s+(?P<status_phy>\S+)\s+(?:\S+)\s+(?P<description>.*)$")
+    pattern = re.compile(
+        r"^(?P<interface>\S+)\s+(?P<status_phy>\S+)\s+(?:\S+)\s+(?P<description>.*)$",
+        re.MULTILINE
+    )
 
     found_interfaces_for_device = []
     if header_idx is not None:
@@ -291,7 +303,7 @@ def extract_huawei_interfaces(net_connect, ip_address, expected_hostname, result
             found_interfaces_for_device.append({
                 'ip_address': ip_address,
                 'expected_hostname': expected_hostname,
-                'brand': 'huawei',
+                'vendor': 'huawei',
                 'interface': interface,
                 'status': status_phy,
                 'description': description,
@@ -309,7 +321,7 @@ def extract_huawei_interfaces(net_connect, ip_address, expected_hostname, result
             found_interfaces_for_device.append({
                 'ip_address': ip_address,
                 'expected_hostname': expected_hostname,
-                'brand': 'huawei',
+                'vendor': 'huawei',
                 'interface': interface,
                 'status': status_phy,
                 'description': description,
@@ -320,17 +332,17 @@ def extract_huawei_interfaces(net_connect, ip_address, expected_hostname, result
         found_interfaces_for_device.append({
             'ip_address': ip_address,
             'expected_hostname': expected_hostname,
-            'brand': 'huawei',
+            'vendor': 'huawei',
             'interface': 'N/A',
             'status': 'N/A',
             'description': 'N/A',
-            'result': 'No relevant interfaces'
+            'result': 'No relevant interfaces with MPLS | INET | P2P found'
         })
     
     with results_lock:
         results.extend(found_interfaces_for_device)
 
-# Dictionary of functions by brand, adjust if SSH or Telnet is required
+# Dictionary of functions by brand; adjust if SSH or Telnet is required
 BRAND_HANDLERS = {
     'cisco': {'params': dev.cisco_ssh, 'extract_func': extract_cisco_interfaces},
     'cisco_nexus': {'params': dev.cisco_ssh, 'extract_func': extract_cisco_nexus_interfaces}, 
@@ -345,7 +357,7 @@ def verify_device(row):
 
     handler = BRAND_HANDLERS.get(vendor)
     if not handler:
-        handle_exceptions(ip_address, expected_hostname, vendor, f"Vendor '{vendor}' not supported", results, results_lock)
+        handle_exceptions(ip_address, expected_hostname, vendor, f"Vendor '{vendor}' no soportado", results, results_lock)
         return
 
     device_params = handler['params']
@@ -368,10 +380,10 @@ with cf.ThreadPoolExecutor() as executor:
         future.result()
 
 # Save results
-output_excel_file = './Results/all_interfaces_results.xlsx'
+output_excel_file = './Results/filtered_interfaces_summary.xlsx'
 save_results(results, output_excel_file)
 
-# Calculate and display the total execution time
+# Calculate and display total execution time
 end_time = time.time()
 elapsed_time = (end_time - start_time) / 60
-pprint(f'Total execution time: {elapsed_time:.2f} minutos')
+pprint(f'Tiempo total de ejecución: {elapsed_time:.2f} minutos')
