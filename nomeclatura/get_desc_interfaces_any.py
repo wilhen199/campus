@@ -65,7 +65,7 @@ def handle_exceptions(ip_address, expected_hostname, vendor, err, results, resul
     with results_lock:
         results.append(error_data)
 
-# Function to extract interfaces from Cisco devices (IOS/IOS-XE)
+# Function to extract interfaces from Cisco devices (IOS/IOS-XE/NX-OS)
 def extract_cisco_interfaces(net_connect, ip_address, expected_hostname, results, results_lock):
     """
     Extracts interfaces from Cisco devices (IOS/IOS-XE)
@@ -122,7 +122,7 @@ def extract_cisco_interfaces(net_connect, ip_address, expected_hostname, results
             'brand': 'cisco',
             'interface': 'N/A',
             'status': 'N/A',
-            'description': 'No interfaces with MPLS or INT found',
+            'description': 'No interfaces with MPLS | INT | P2P found',
             'result': 'No relevant interfaces'
         })
     
