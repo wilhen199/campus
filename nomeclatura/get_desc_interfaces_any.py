@@ -56,7 +56,7 @@ def handle_exceptions(ip_address, expected_hostname, vendor, err, results, resul
     error_data = {
         'ip_address': ip_address,
         'expected_hostname': expected_hostname,
-        'brand': vendor,
+        'vendor': vendor,
         'interface': 'N/A',
         'status': 'N/A',
         'description': error_msg,
@@ -108,7 +108,7 @@ def extract_cisco_interfaces(net_connect, ip_address, expected_hostname, results
         found_interfaces_for_device.append({
             'ip_address': ip_address,
             'expected_hostname': expected_hostname,
-            'brand': 'cisco',
+            'vendor': 'cisco',
             'interface': interface,
             'status': status,
             'description': description,
@@ -119,7 +119,7 @@ def extract_cisco_interfaces(net_connect, ip_address, expected_hostname, results
         found_interfaces_for_device.append({
             'ip_address': ip_address,
             'expected_hostname': expected_hostname,
-            'brand': 'cisco',
+            'vendor': 'cisco',
             'interface': 'N/A',
             'status': 'N/A',
             'description': 'No interfaces with MPLS | INT | P2P found',
@@ -153,7 +153,7 @@ def extract_cisco_nexus_interfaces(net_connect, ip_address, expected_hostname, r
         found_interfaces_for_device.append({
             'ip_address': ip_address,
             'expected_hostname': expected_hostname,
-            'brand': 'cisco',
+            'vendor': 'cisco',
             'interface': interface,
             'status': speed,
             'description': description,
@@ -164,7 +164,7 @@ def extract_cisco_nexus_interfaces(net_connect, ip_address, expected_hostname, r
         found_interfaces_for_device.append({
             'ip_address': ip_address,
             'expected_hostname': expected_hostname,
-            'brand': 'cisco',
+            'vendor': 'cisco',
             'interface': 'N/A',
             'status': 'N/A',
             'description': 'No interfaces with MPLS or INT found (Cisco Nexus)',
@@ -217,7 +217,7 @@ def extract_extreme_interfaces(net_connect, ip_address, expected_hostname, resul
             found_interfaces_for_device.append({
                 'ip_address': ip_address,
                 'expected_hostname': expected_hostname,
-                'brand': 'extreme',
+                'vendor': 'extreme',
                 'interface': interface,
                 'status': 'N/A',
                 'description': display,
@@ -235,7 +235,7 @@ def extract_extreme_interfaces(net_connect, ip_address, expected_hostname, resul
             found_interfaces_for_device.append({
                 'ip_address': ip_address,
                 'expected_hostname': expected_hostname,
-                'brand': 'extreme',
+                'vendor': 'extreme',
                 'interface': interface,
                 'status': 'N/A',
                 'description': description,
@@ -246,7 +246,7 @@ def extract_extreme_interfaces(net_connect, ip_address, expected_hostname, resul
         found_interfaces_for_device.append({
             'ip_address': ip_address,
             'expected_hostname': expected_hostname,
-            'brand': 'extreme',
+            'vendor': 'extreme',
             'interface': 'N/A',
             'status': 'N/A',
             'description': 'No interfaces description found',
@@ -291,7 +291,7 @@ def extract_huawei_interfaces(net_connect, ip_address, expected_hostname, result
             found_interfaces_for_device.append({
                 'ip_address': ip_address,
                 'expected_hostname': expected_hostname,
-                'brand': 'huawei',
+                'vendor': 'huawei',
                 'interface': interface,
                 'status': status_phy,
                 'description': description,
@@ -309,7 +309,7 @@ def extract_huawei_interfaces(net_connect, ip_address, expected_hostname, result
             found_interfaces_for_device.append({
                 'ip_address': ip_address,
                 'expected_hostname': expected_hostname,
-                'brand': 'huawei',
+                'vendor': 'huawei',
                 'interface': interface,
                 'status': status_phy,
                 'description': description,
@@ -320,7 +320,7 @@ def extract_huawei_interfaces(net_connect, ip_address, expected_hostname, result
         found_interfaces_for_device.append({
             'ip_address': ip_address,
             'expected_hostname': expected_hostname,
-            'brand': 'huawei',
+            'vendor': 'huawei',
             'interface': 'N/A',
             'status': 'N/A',
             'description': 'N/A',
