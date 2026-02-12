@@ -94,7 +94,7 @@ def extract_cisco_interfaces(net_connect, ip_address, expected_hostname, results
     )
     
     pattern = re.compile(
-        r"^(?P<interface>\S+)\s+(?P<status>admin down|down|up)\s+(?:\S+)\s+(?P<description>.*(?:MPLS|INET).*)$",
+        r"^(?P<interface>\S+)\s+(?P<status>admin down|down|up)\s+(?:\S+)\s+(?P<description>.*(?:MPLS|INET|P2P).*)$",
         re.MULTILINE
     )
     
@@ -122,7 +122,7 @@ def extract_cisco_interfaces(net_connect, ip_address, expected_hostname, results
             'vendor': 'cisco',
             'interface': 'N/A',
             'status': 'N/A',
-            'description': 'No interfaces with MPLS | INT | P2P found',
+            'description': 'No interfaces with MPLS | INET | P2P found',
             'result': 'No relevant interfaces'
         })
     
@@ -175,7 +175,7 @@ def extract_cisco_nexus_interfaces(net_connect, ip_address, expected_hostname, r
             'vendor': 'cisco',
             'interface': 'N/A',
             'status': 'N/A',
-            'description': 'No interfaces with MPLS | INT | P2P found (Cisco Nexus)',
+            'description': 'No interfaces with MPLS | INET | P2P found (Cisco Nexus)',
             'result': 'No relevant interfaces'
         })
     
