@@ -427,7 +427,12 @@ BRAND_HANDLERS = {
 def verify_device(row):
     ip_address = row['ip_address']
     expected_hostname = row.get('expected_hostname', 'N/A')
-    vendor = row['vendor'].lower()
+    # Defensive: handle missing or NaN vendor values coming from Excel
+    vendor_raw = row.get('vendor', '')
+    if pd.isna(vendor_raw):
+        vendor = ''
+    else:
+        vendor = str(vendor_raw).strip().lower()
 
     handler = BRAND_HANDLERS.get(vendor)
     if not handler:
