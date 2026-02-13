@@ -177,13 +177,13 @@ def extract_cisco_nexus_interfaces(net_connect, ip_address, expected_hostname, r
 # Function to extract interfaces from Extreme devices
 def extract_extreme_interfaces(net_connect, ip_address, expected_hostname, results, results_lock):
     """Extracts interfaces from Extreme devices."""
-    current_prompt = net_connect.find_prompt()
+    prompt_pattern = rf"({re.escape(expected_hostname)})\.\d+\s*#\s*"
     output_interfaces = net_connect.send_command(
-        f"show port description ",
-        expect_string=current_prompt,
+        f"show port no-refresh ",
+        expect_string=prompt_pattern,
         read_timeout=180
     )
-    
+
     lines = output_interfaces.splitlines()
     header_idx = None
     header_line = None
@@ -196,22 +196,69 @@ def extract_extreme_interfaces(net_connect, ip_address, expected_hostname, resul
     found_interfaces_for_device = []
 
     if header_line:
-        disp_start = header_line.find('Display')
-        desc_start = header_line.find('Description')
-        if disp_start == -1:
-            disp_start = 6
-        if desc_start == -1:
-            desc_start = disp_start + 20
+        # Combine header line with the following line if it contains secondary headers (State/Link)
+        combined_header = header_line
+        if header_idx + 1 < len(lines) and any(k in lines[header_idx+1] for k in ('State', 'Link', '#')):
+            combined_header = header_line + ' ' + lines[header_idx+1]
 
-        for ln in lines[header_idx+1:]:
-            if not ln.strip() or ln.strip().startswith('====='):
+        lower = combined_header.lower()
+        port_start = lower.find('port') if lower.find('port') != -1 else 0
+        display_start = lower.find('display', port_start + 1) if lower.find('display', port_start + 1) != -1 else port_start + 6
+        vlan_start = lower.find('vlan', display_start + 1) if lower.find('vlan', display_start + 1) != -1 else display_start + 12
+        # detect positions of 'state' occurrences (Port State and Link State)
+        state_positions = [m.start() for m in re.finditer(r'state', lower)]
+        status1_start = state_positions[0] if len(state_positions) > 0 else -1 # Port State
+        status2_start = state_positions[1] if len(state_positions) > 1 else -1 # Link State
+        duplex_start = lower.find('duplex') if lower.find('duplex') != -1 else (status2_start if status2_start != -1 else (status1_start if status1_start != -1 else display_start + 36))
+
+        # start after the secondary header line (the second header row with '#' and State/Link)
+        for ln in lines[header_idx+2:]:
+            if not ln.strip() or ln.strip().startswith('=====') or ln.strip().startswith('----'):
                 continue
 
-            ln_padded = ln + ' ' * (max(0, desc_start - len(ln)))
-            interface = ln_padded[:disp_start].strip()
-            display = ln_padded[disp_start:desc_start].strip()
+            ln_padded = ln + ' ' * (max(0, duplex_start - len(ln)))
+            interface = ln_padded[port_start:display_start].strip()
+            # Tokenize early so it's always available for fallback logic
+            parts = re.split(r'\s{2,}', ln.strip())
+            # Prefer slicing between Display and VLAN columns to get the Display String
+            display_slice = ln_padded[display_start:vlan_start].strip()
+            # only accept display_slice if it doesn't look like a VLAN token (e.g. '(0002)' or 'Default')
+            if display_slice and not re.match(r'^\(?\d+\)?$', display_slice) and display_slice.lower() not in ('default', 'none', 'n/a'):
+                description = display_slice
+            else:
+                # fallback: tokenized parsing only if token looks like a real display (letters, not VLAN numeric)
+                if len(parts) > 1 and parts[1].strip() and re.search(r'[A-Za-z]', parts[1].strip()) and not re.match(r'^\(?\d+\)?$', parts[1].strip()) and parts[1].strip().lower() not in ('default', 'none', 'n/a'):
+                    description = parts[1].strip()
+                else:
+                    description = ''
 
-            if not display:
+            # Try to extract status using column slices (from second header positions)
+            status = ''
+            if status1_start != -1 and status2_start != -1 and status2_start > status1_start:
+                status1 = ln_padded[status1_start:status2_start].strip()
+                status2 = ln_padded[status2_start:duplex_start].strip()
+                status = (status1 + ' ' + status2).strip()
+            elif status1_start != -1:
+                status = ln_padded[status1_start:duplex_start].strip()
+
+            # Remove any VLAN-like tokens from status (e.g., '(0002)') that may have leaked into slicing
+            status = re.sub(r"\(?\d{2,}\)?", '', status).strip()
+
+            # Fallback: split by 2+ spaces and build status from tokens (skip VLAN-like tokens)
+            if not status:
+                parts2 = parts
+                state_tokens = [t.strip() for t in parts2[2:] if not re.match(r'^\(?\d+\)?$', t.strip()) and t.strip()]
+                # keep only tokens containing letters (D, E, R, A, NP, FULL, etc.)
+                state_tokens = [t for t in state_tokens if re.search(r'[A-Za-z]', t)]
+                if len(state_tokens) >= 2:
+                    status = (state_tokens[0] + ' ' + state_tokens[1]).strip()
+                elif len(state_tokens) == 1:
+                    status = state_tokens[0].strip()
+
+            duplex_field = ln_padded[duplex_start:].strip()
+            duplex = duplex_field.split()[0] if duplex_field else ''
+
+            if not interface or not re.search(r"\d", interface):
                 continue
             
             found_interfaces_for_device.append({
@@ -219,25 +266,33 @@ def extract_extreme_interfaces(net_connect, ip_address, expected_hostname, resul
                 'expected_hostname': expected_hostname,
                 'vendor': 'extreme',
                 'interface': interface,
-                'status': 'N/A',
-                'description': display,
+                'status': status or '',
+                'description': description,
                 'result': 'Success'
             })
     else:
         # Fallback: try regex per line
-        pattern = re.compile(r"^\s*(?P<interface>\d+)\s+(?P<description>.*?)\s*$", re.MULTILINE)
-        matches = pattern.finditer(output_interfaces)
-        for match in matches:
-            interface = match.group("interface").strip()
-            description = match.group("description").strip()
-            if not description:
+        parts_pattern = re.compile(r"\s{2,}")
+        for ln in lines:
+            if not ln.strip() or ln.strip().startswith('====='):
                 continue
+            parts = parts_pattern.split(ln.strip())
+            if len(parts) < 2:
+                continue
+            interface = parts[0].strip()
+            description = parts[1].strip() if len(parts) > 1 else ''
+            status = parts[2].strip() if len(parts) > 2 else ''
+            duplex = parts[3].strip() if len(parts) > 3 else ''
+
+            if not interface or not re.search(r"\d", interface):
+                continue
+            
             found_interfaces_for_device.append({
                 'ip_address': ip_address,
                 'expected_hostname': expected_hostname,
                 'vendor': 'extreme',
                 'interface': interface,
-                'status': 'N/A',
+                'status': status or '',
                 'description': description,
                 'result': 'Success'
             })
@@ -341,7 +396,11 @@ BRAND_HANDLERS = {
 def verify_device(row):
     ip_address = row['ip_address']
     expected_hostname = row.get('expected_hostname', 'N/A')
-    vendor = row['vendor'].lower()
+    vendor_raw = row.get('vendor', '')
+    if pd.isna(vendor_raw):
+        vendor = ''
+    else:
+        vendor = str(vendor_raw).strip().lower()
 
     handler = BRAND_HANDLERS.get(vendor)
     if not handler:
