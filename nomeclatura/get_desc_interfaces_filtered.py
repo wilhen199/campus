@@ -146,7 +146,7 @@ def extract_cisco_nexus_interfaces(net_connect, ip_address, expected_hostname, r
     output_interfaces_filtered = "\n".join(relevant_lines)
 
     pattern = re.compile(
-        r"^(?P<interface>\S+)\s+\S+\s+\S+\s+(?P<description>.*(?:MPLS|INET|P2P).*)$",
+        r"^(?P<interface>\S+)\s+\S+\s+(?P<speed>\S+)+\s+(?P<description>.*(?:MPLS|INET|P2P).*)$",
         re.MULTILINE
     )
     
@@ -155,8 +155,9 @@ def extract_cisco_nexus_interfaces(net_connect, ip_address, expected_hostname, r
     for match in matches:
         interface = match.group("interface").strip()
         description = match.group("description").strip()
+        status = match.group("speed").strip()
         
-        status = "N/A (from description)" # Status is not directly available from this command on Nexus
+        #status = "N/A (from description)" # Status is not directly available from this command on Nexus
         
         found_interfaces_for_device.append({
             'ip_address': ip_address,
@@ -227,7 +228,7 @@ def extract_extreme_interfaces(net_connect, ip_address, expected_hostname, resul
                 'expected_hostname': expected_hostname,
                 'vendor': 'extreme',
                 'interface': interface,
-                'status': 'N/A',
+                'status': '',
                 'description': display,
                 'result': 'Success'
             })
@@ -245,7 +246,7 @@ def extract_extreme_interfaces(net_connect, ip_address, expected_hostname, resul
                 'expected_hostname': expected_hostname,
                 'vendor': 'extreme',
                 'interface': interface,
-                'status': 'N/A',
+                'status': '',
                 'description': description,
                 'result': 'Success'
             })
@@ -255,8 +256,8 @@ def extract_extreme_interfaces(net_connect, ip_address, expected_hostname, resul
             'ip_address': ip_address,
             'expected_hostname': expected_hostname,
             'vendor': 'extreme',
-            'interface': 'N/A',
-            'status': 'N/A',
+            'interface': '',
+            'status': '',
             'description': 'No interfaces description found with MPLS | INET | P2P',
             'result': 'No relevant interfaces'
         })
