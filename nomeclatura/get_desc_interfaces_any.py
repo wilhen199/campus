@@ -142,7 +142,8 @@ def extract_cisco_nexus_interfaces(net_connect, ip_address, expected_hostname, r
     lines = output_interfaces_raw.splitlines()
     found_interfaces_for_device = []
     for line in lines:
-        if not line.strip() or line.lower().startswith('Eth'):
+        # Skip empty lines and header lines starting with 'Port'
+        if not line.strip() or line.strip().lower().startswith('port'):
             continue
         parts = re.split(r'\s{3,}', line.strip(), maxsplit=3)
         if len(parts) < 3:
@@ -226,11 +227,16 @@ def extract_extreme_interfaces(net_connect, ip_address, expected_hostname, resul
             if display_slice and not re.match(r'^\(?\d+\)?$', display_slice) and display_slice.lower() not in ('default', 'none', 'n/a'):
                 description = display_slice
             else:
-                # fallback: tokenized parsing only if token looks like a real display (letters, not VLAN numeric)
-                if len(parts) > 1 and parts[1].strip() and re.search(r'[A-Za-z]', parts[1].strip()) and not re.match(r'^\(?\d+\)?$', parts[1].strip()) and parts[1].strip().lower() not in ('default', 'none', 'n/a'):
-                    description = parts[1].strip()
+                    # fallback: tokenized parsing only if token looks like a real display (letters, not VLAN numeric)
+                if len(parts) > 1:
+                        desc_candidate = parts[1].strip()
+                        # reject VLAN-like tokens, common 'none' values and short uppercase single/two-letter status tokens
+                        if desc_candidate and re.search(r'[A-Za-z]', desc_candidate) and not re.match(r'^\(?\d+\)?$', desc_candidate) and desc_candidate.lower() not in ('default', 'none', 'n/a') and not re.fullmatch(r'[A-Z]{1,2}', desc_candidate):
+                            description = desc_candidate
+                        else:
+                            description = ''
                 else:
-                    description = ''
+                        description = ''
 
             # Try to extract status using column slices (from second header positions)
             status = ''
@@ -247,7 +253,10 @@ def extract_extreme_interfaces(net_connect, ip_address, expected_hostname, resul
             # Fallback: split by 2+ spaces and build status from tokens (skip VLAN-like tokens)
             if not status:
                 parts2 = parts
-                state_tokens = [t.strip() for t in parts2[2:] if not re.match(r'^\(?\d+\)?$', t.strip()) and t.strip()]
+                # If description was empty, state tokens may start at index 1, otherwise at index 2
+                start_idx = 1 if not description else 2
+                candidate_tokens = parts2[start_idx:]
+                state_tokens = [t.strip() for t in candidate_tokens if not re.match(r'^\(?\d+\)?$', t.strip()) and t.strip()]
                 # keep only tokens containing letters (D, E, R, A, NP, FULL, etc.)
                 state_tokens = [t for t in state_tokens if re.search(r'[A-Za-z]', t)]
                 if len(state_tokens) >= 2:
@@ -302,8 +311,8 @@ def extract_extreme_interfaces(net_connect, ip_address, expected_hostname, resul
             'ip_address': ip_address,
             'expected_hostname': expected_hostname,
             'vendor': 'extreme',
-            'interface': 'N/A',
-            'status': 'N/A',
+            'interface': '',
+            'status': '',
             'description': 'No interfaces description found',
             'result': 'No relevant interfaces'
         })
