@@ -161,14 +161,14 @@ def set_cisco_nexus_interfaces(net_connect, ip_address, expected_hostname, inter
 # Function to set interfaces on Extreme devices
 def set_extreme_interfaces(net_connect, ip_address, expected_hostname,interface_device, description, results, results_lock):
     """Configure interfaces description on Extreme devices."""
-    current_prompt = net_connect.find_prompt()
-    net_connect.send_command(f"show port description", expect_string=current_prompt, read_timeout=180)
+    prompt_pattern = rf"({re.escape(expected_hostname)})\.\d+\s*#\s*"
+    net_connect.send_command(f"show port no-refresh", expect_string=prompt_pattern, read_timeout=180)
     
     # Configuration
     config_commands = [ f"configure ports {interface_device} display-string {description}"]
     net_connect.send_config_set(config_commands)
     pprint(f"Descripción actualizada: {ip_address} {expected_hostname} {interface_device} {description}")
-    net_connect.send_command(f"show port description", expect_string=current_prompt, read_timeout=180)
+    net_connect.send_command(f"show port no-refresh", expect_string=prompt_pattern, read_timeout=180)
     
     # Save configuration
     net_connect.send_command_timing('save configuration', strip_prompt=False, strip_command=False)
